@@ -1,3 +1,18 @@
+"""
+models.py
+---------
+Pydantic models define the *shape* and *validation rules* of the data.
+FastAPI uses these to auto-validate incoming requests and auto-generate
+the OpenAPI docs (visible at /docs).
+
+We use separate models for Create / Replace / Update / Output because
+each operation has different rules about which fields are required:
+  - POST  (create)  -> everything required
+  - PUT   (replace) -> everything required (you're sending the whole resource)
+  - PATCH (update)  -> everything optional (you send only what's changing)
+  - Output           -> includes the DB-generated id, which the client never sends
+"""
+
 from datetime import datetime
 from enum import Enum
 from typing import List, Optional
@@ -16,10 +31,15 @@ class StatusEnum(str, Enum):
 
 
 class ProductBase(BaseModel):
+    # string
     name: str = Field(..., min_length=1, max_length=100)
+    # float
     price: float = Field(..., gt=0, description="Must be greater than 0")
+    # integer
     quantity_in_stock: int = Field(..., ge=0, description="Cannot be negative")
+    # boolean
     is_active: bool = True
+    # list of strings
     tags: List[str] = Field(default_factory=list)
     # enum (closed set of strings)
     status: StatusEnum = StatusEnum.IN_STOCK
@@ -67,3 +87,12 @@ class ProductOut(ProductBase):
         # Allows this model to be built directly from a dict with extra
         # Mongo fields (like _id) without raising validation errors.
         populate_by_name = True
+
+
+class OTPVerifyRequest(BaseModel):
+    """Used for POST /verify-otp -- step 2 of login. Sent as raw JSON,
+    unlike /login which needs form-urlencoded (that's an OAuth2 spec
+    requirement specific to OAuth2PasswordRequestForm, not a rule that
+    applies here)."""
+    username: str
+    otp: str = Field(..., min_length=6, max_length=6)
